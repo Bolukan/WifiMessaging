@@ -1,0 +1,29 @@
+{
+  "name":"WifiMessaging",
+  "description":"One ESP8266 library for WiFi, NTP, SecureClient and Messaging clients like MQTT and Telegram.",
+  "keywords":"WiFi,NTP,SecureClient,Telegram,MQTT"
+  "authors":
+  {
+    "name": "Bolukan <wifimessaging@bolukan.nl>",
+    "maintainer": true
+  },
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/Bolukan/WifiMessaging.git"
+  },
+  "version": "0.9",
+  "license": "LGPL-3.0",
+  "frameworks": "arduino",
+  "platforms": "espressif8266",
+  "dependencies": [
+    {
+      "name": "PubSubClient"
+    },
+    {
+      "name": "UniversalTelegramBot"
+    }
+  ]
+  "build": {
+  }
+}
