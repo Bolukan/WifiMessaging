@@ -6,9 +6,9 @@
 #define TIME_ENV_TZ "CET-1CEST,M3.5.0,M10.5.0/3"
 
 WifiMessaging::WifiMessaging(uint16_t connectionServices)
-    : _connectionServices(CheckConnectionServices(connectionServices)),
-      bot(TELEGRAM_BOT, secureClient),
-      cert(CERTIFICATE_ROOT)
+    : cert(CERTIFICATE_ROOT),
+      _connectionServices(CheckConnectionServices(connectionServices)),
+      bot(TELEGRAM_BOT, secureClient)
 {
   DEBUG_WIFIMESSAGING_BEGIN();
 
@@ -47,45 +47,10 @@ WifiMessaging::WifiMessaging(uint16_t connectionServices)
 }
 
 WifiMessaging::WifiMessaging(uint16_t connectionServices, MQTT_CALLBACK_SIGNATURE)
-    : _connectionServices(CheckConnectionServices(connectionServices)),
-      bot(TELEGRAM_BOT, secureClient),
-      cert(CERTIFICATE_ROOT)
+    : WifiMessaging(connectionServices)
 {
-  DEBUG_WIFIMESSAGING_BEGIN();
 
-  if (_connectionServices & ServiceWifi)
-  {
-    StatusWiFi = ConnectionInactive;
-    InitialiseWiFi();
-  }
-
-  if (_connectionServices & ServiceMQTT)
-  {
-    StatusMQTT = ConnectionInactive;
-    InitialiseMQTT(callback);
-  }
-
-  if (_connectionServices & ServiceNTP)
-  {
-    StatusNTP = ConnectionInactive;
-    InitialiseNTP();
-  }
-
-  // Started after NTP
-  if (_connectionServices & ServiceSecure)
-  {
-    StatusSecure = ConnectionInactive;
-    // InitialiseSecure();  // Started after NTP
-  }
-
-  // Started after SecureClient
-  if (_connectionServices & ServiceTelegram)
-  {
-    StatusTelegram = ConnectionInactive;
-    // InitialiseTelegram();  // Started after SecureClient
-  }
-
-  DEBUG_WIFIMESSAGING_PRINTF("WifiMessaging initialised\n");
+  InitialiseMQTT(callback);
 }
 
 uint16_t WifiMessaging::CheckConnectionServices(uint16_t connectionServices)
@@ -205,21 +170,21 @@ void WifiMessaging::disconnectFromWiFi()
 void WifiMessaging::onSTAConnected(const WiFiEventStationModeConnected &e /*String ssid, uint8 bssid[6], uint8 channel*/)
 {
   DEBUG_WIFIMESSAGING_PRINTF("WiFi Connected: SSID %s @ BSSID %.2X:%.2X:%.2X:%.2X:%.2X:%.2X Channel %d\n",
-                      e.ssid.c_str(), e.bssid[0], e.bssid[1], e.bssid[2], e.bssid[3], e.bssid[4], e.bssid[5], e.channel);
+                             e.ssid.c_str(), e.bssid[0], e.bssid[1], e.bssid[2], e.bssid[3], e.bssid[4], e.bssid[5], e.channel);
 }
 
 void WifiMessaging::onSTADisconnected(const WiFiEventStationModeDisconnected &e /*String ssid, uint8 bssid[6], WiFiDisconnectReason reason*/)
 {
   // Reason: https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/src/ESP8266WiFiType.h
   DEBUG_WIFIMESSAGING_PRINTF("WiFi Disconnected: SSID %s BSSID %.2X:%.2X:%.2X:%.2X:%.2X:%.2X Reason %d\n",
-                      e.ssid.c_str(), e.bssid[0], e.bssid[1], e.bssid[2], e.bssid[3], e.bssid[4], e.bssid[5], e.reason);
+                             e.ssid.c_str(), e.bssid[0], e.bssid[1], e.bssid[2], e.bssid[3], e.bssid[4], e.bssid[5], e.reason);
   StatusWiFi = ConnectionInactive;
 }
 
 void WifiMessaging::onSTAGotIP(const WiFiEventStationModeGotIP &e /*IPAddress ip, IPAddress mask, IPAddress gw*/)
 {
   DEBUG_WIFIMESSAGING_PRINTF("WiFi GotIP: localIP %s SubnetMask %s GatewayIP %s\n",
-                      e.ip.toString().c_str(), e.mask.toString().c_str(), e.gw.toString().c_str());
+                             e.ip.toString().c_str(), e.mask.toString().c_str(), e.gw.toString().c_str());
   StatusWiFi = ConnectionActive;
 
   if (_connectionServices & ServiceMQTT)

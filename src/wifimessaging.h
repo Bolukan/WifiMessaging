@@ -18,19 +18,19 @@
 
 #ifdef DEBUG_WIFIMESSAGING_TO_SERIAL
 #define DEBUG_WIFIMESSAGING_BEGIN() \
-  if (!Serial)               \
+  if (!Serial)                      \
   Serial.begin(115200)
 #define DEBUG_WIFIMESSAGING_PRINT(x) Serial.print(x)
 #define DEBUG_WIFIMESSAGING_PRINTLN(x) Serial.println(x)
-#define DEBUG_WIFIMESSAGING_PRINTF(...)    \
-  {                                 \
-    Serial.printf("%lu", millis()); \
-    Serial.print("mS L");           \
-    Serial.print(__LINE__);         \
-    Serial.print("/");              \
-    Serial.print(__FUNCTION__);     \
-    Serial.print(": ");             \
-    Serial.printf(__VA_ARGS__);     \
+#define DEBUG_WIFIMESSAGING_PRINTF(...) \
+  {                                     \
+    Serial.printf("%lu", millis());     \
+    Serial.print("mS L");               \
+    Serial.print(__LINE__);             \
+    Serial.print("/");                  \
+    Serial.print(__FUNCTION__);         \
+    Serial.print(": ");                 \
+    Serial.printf(__VA_ARGS__);         \
   }
 #define DEBUG_WIFIMESSAGING_FLUSH() Serial.flush()
 #else
