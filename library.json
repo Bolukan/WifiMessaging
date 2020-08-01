@@ -1,7 +1,7 @@
 {
   "name":"WifiMessaging",
   "description":"One ESP8266 library for WiFi, NTP, SecureClient and Messaging clients like MQTT and Telegram.",
-  "keywords":"WiFi,NTP,SecureClient,Telegram,MQTT"
+  "keywords":"WiFi,NTP,SecureClient,Telegram,MQTT",
   "authors":
   {
     "name": "Bolukan <wifimessaging@bolukan.nl>",
@@ -23,7 +23,7 @@
     {
       "name": "UniversalTelegramBot"
     }
-  ]
+  ],
   "build": {
   }
 }
