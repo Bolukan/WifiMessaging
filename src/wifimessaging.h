@@ -78,6 +78,8 @@ public:
   WiFiClient wifiClient; ///< WifiClient object
 
   PubSubClient mqttClient; ///< PubSubClient object
+  
+  Ticker timechecker;
 
   BearSSL::WiFiClientSecure secureClient;
   BearSSL::X509List cert;
@@ -94,17 +96,6 @@ public:
   WifiMessaging(uint16_t connectionServices, MQTT_CALLBACK_SIGNATURE);
 
   /**
-   * @brief Congruent combination of connection services
-   * 
-   *  WiFi
-   *   |-- MQTT (Insecure)
-   *   |-- NTP (Time)
-   *       |-- WiFiSecure
-   *           |-- Telegram
-   */
-  uint16_t CheckConnectionServices(uint16_t connectionServices);
-
-  /**
    * @brief Connect to WiFi
    */
   void connectToWiFi();
@@ -115,39 +106,9 @@ public:
   void disconnectFromWiFi();
 
   /**
-   * @brief Event WiFi Station connected
-   */
-  void onSTAConnected(const WiFiEventStationModeConnected &e /*String ssid, uint8 bssid[6], uint8 channel*/);
-
-  /**
-   * @brief Event WiFi Station disconnected
-   */
-  void onSTADisconnected(const WiFiEventStationModeDisconnected &e /*String ssid, uint8 bssid[6], WiFiDisconnectReason reason*/);
-
-  /**
-   * @brief Event Got IP from WiFi Station
-   */
-  void onSTAGotIP(const WiFiEventStationModeGotIP &e /*IPAddress ip, IPAddress mask, IPAddress gw*/);
-
-  /**
    * @brief macId as 12 hexnumber
    */
   String macId();
-
-  /**
-   * @brief Local time
-   */
-  struct tm Timeinfo(struct tm &timeinfo);
-
-  /**
-   * @brief Initialise MQTT
-   */
-  void InitialiseMQTT(MQTT_CALLBACK_SIGNATURE);
-
-  /**
-   * @brief Connect to MQTT server
-   */
-  void ConnectToMqtt();
 
   /**
    * @brief send Telegram message
@@ -165,9 +126,35 @@ private:
   UniversalTelegramBot bot;
 
   /**
+   * @brief Congruent combination of connection services
+   * 
+   *  WiFi
+   *   |-- MQTT (Insecure)
+   *   |-- NTP (Time)
+   *       |-- WiFiSecure
+   *           |-- Telegram
+   */
+  uint16_t CheckConnectionServices(uint16_t connectionServices);
+
+  /**
    * @brief Initialise WiFi
    */
   void InitialiseWiFi();
+
+  /**
+   * @brief Event WiFi Station connected
+   */
+  void onSTAConnected(const WiFiEventStationModeConnected &e /*String ssid, uint8 bssid[6], uint8 channel*/);
+
+  /**
+   * @brief Event WiFi Station disconnected
+   */
+  void onSTADisconnected(const WiFiEventStationModeDisconnected &e /*String ssid, uint8 bssid[6], WiFiDisconnectReason reason*/);
+
+  /**
+   * @brief Event Got IP from WiFi Station
+   */
+  void onSTAGotIP(const WiFiEventStationModeGotIP &e /*IPAddress ip, IPAddress mask, IPAddress gw*/);
 
   /**
    * @brief Initialise NTP
@@ -175,9 +162,24 @@ private:
   void InitialiseNTP();
 
   /**
+   * @brief Check time received via NTP
+   */
+  void checkNTP();
+
+  /**
    * @brief Initialise Secure
    */
   void InitialiseSecure();
+
+  /**
+   * @brief Initialise MQTT
+   */
+  void InitialiseMQTT(MQTT_CALLBACK_SIGNATURE);
+
+  /**
+   * @brief Connect to MQTT server
+   */
+  void ConnectToMqtt();
 
   /**
    * @brief Initialise Telegram

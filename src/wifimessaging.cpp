@@ -49,7 +49,6 @@ WifiMessaging::WifiMessaging(uint16_t connectionServices)
 WifiMessaging::WifiMessaging(uint16_t connectionServices, MQTT_CALLBACK_SIGNATURE)
     : WifiMessaging(connectionServices)
 {
-
   InitialiseMQTT(callback);
 }
 
@@ -98,6 +97,29 @@ void WifiMessaging::InitialiseNTP()
   configTime(0, 0, TIME_NTPSERVER_1, TIME_NTPSERVER_2);
   setenv("TZ", TIME_ENV_TZ, /*overwrite*/ 1);
   tzset();
+
+  timechecker.attach_ms(500, std::bind(&WifiMessaging::checkNTP, this));
+}
+
+void WifiMessaging::checkNTP()
+{
+  time_t now = time(nullptr);
+  
+  if (StatusNTP != ConnectionActive && now > 24 * 3600)
+  {
+    StatusNTP = ConnectionActive;
+    timechecker.detach();
+
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
+    DEBUG_WIFIMESSAGING_PRINTF("Localtime: %s\n", asctime(&timeinfo));
+
+    if ((_connectionServices & ServiceSecure) && (StatusSecure != ConnectionActive))
+    {
+      StatusSecure = ConnectionInactiveToActive;
+      InitialiseSecure();
+    }
+  }
 }
 
 void WifiMessaging::InitialiseSecure()
@@ -215,25 +237,6 @@ String WifiMessaging::macId()
   wifi_get_macaddr(STATION_IF, mac);
   sprintf(macStr, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   return String(macStr);
-}
-
-struct tm WifiMessaging::Timeinfo(struct tm &timeinfo)
-{
-  time_t now = time(nullptr);
-  localtime_r(&now, &timeinfo);
-
-  if (StatusNTP != ConnectionActive && now > 24 * 3600)
-  {
-    DEBUG_WIFIMESSAGING_PRINTF("Localtime: %s\n", asctime(&timeinfo));
-    StatusNTP = ConnectionActive;
-
-    if ((_connectionServices & ServiceSecure) && (StatusSecure != ConnectionActive))
-    {
-      StatusSecure = ConnectionInactiveToActive;
-      InitialiseSecure();
-    }
-  }
-  return timeinfo;
 }
 
 bool WifiMessaging::sendMessage(const String &text, const String &parse_mode)
