@@ -28,7 +28,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
 void setup()
 {
-  Serial.begin(115200);
+  if (!Serial) Serial.begin(115200);
   Serial.println("\nWifi Messaging test.");
 
   myWM.connectToWiFi();
@@ -36,6 +36,9 @@ void setup()
 
 void loop()
 {
+  // Start MQTT after WiFi, Secure after NTP, Telegram after Secure
+  myWM.loop();
+
   if (
       (myWM.StatusTelegram == myWM.ConnectionActive) &&
       (myWM.StatusMQTT == myWM.ConnectionActive) &&

@@ -9,7 +9,7 @@
 #include <PubSubClient.h>     // 89              - https://github.com/knolleary/pubsubclient.git
 #include <time.h>             // Arduino library - https://github.com/esp8266/Arduino/blob/master/tools/sdk/libc/xtensa-lx106-elf/include/time.h
 #include <WiFiClientSecure.h> // Arduino library - https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/src/WiFiClientSecure.h
-#include <UniversalTelegramBot.h>
+#include <UniversalTelegramBot.h> // 1262
 
 // **************************************** DEBUG ****************************************
 
@@ -17,9 +17,9 @@
 #define DEBUG_WIFIMESSAGING_TO_SERIAL 1
 
 #ifdef DEBUG_WIFIMESSAGING_TO_SERIAL
-#define DEBUG_WIFIMESSAGING_BEGIN() \
-  if (!Serial)                      \
-  Serial.begin(115200)
+#define DEBUG_WIFIMESSAGING_BEGIN()  \
+  if (!Serial) Serial.begin(115200); \
+  Serial.println();
 #define DEBUG_WIFIMESSAGING_PRINT(x) Serial.print(x)
 #define DEBUG_WIFIMESSAGING_PRINTLN(x) Serial.println(x)
 #define DEBUG_WIFIMESSAGING_PRINTF(...) \
@@ -54,10 +54,11 @@ class WifiMessaging
 public:
   enum connectionStatus
   {
-    ConnectionActive = 0,
+    ConnectionInactive = 0,
     ConnectionActiveToInactive = 1,
     ConnectionInactiveToActive = 2,
-    ConnectionInactive = 3
+    ConnectionActive = 3,
+    ConnectionActiveNew = 4
   };
 
   enum connectionService : uint16_t
@@ -78,7 +79,7 @@ public:
   WiFiClient wifiClient; ///< WifiClient object
 
   PubSubClient mqttClient; ///< PubSubClient object
-  
+
   Ticker timechecker;
 
   BearSSL::WiFiClientSecure secureClient;
@@ -94,6 +95,11 @@ public:
    * @brief WifiMessaging constructor with MQTT
    */
   WifiMessaging(uint16_t connectionServices, MQTT_CALLBACK_SIGNATURE);
+
+  /**
+   * @brief Act on situation
+   */
+  void loop();
 
   /**
    * @brief Connect to WiFi
@@ -142,6 +148,31 @@ private:
   void InitialiseWiFi();
 
   /**
+   * @brief Initialise MQTT
+   */
+  void InitialiseMQTT(MQTT_CALLBACK_SIGNATURE);
+
+  /**
+   * @brief Connect to MQTT server
+   */
+  void ConnectToMqtt();
+
+  /**
+   * @brief Initialise NTP
+   */
+  void InitialiseNTP();
+
+  /**
+   * @brief Initialise Secure
+   */
+  void InitialiseSecure();
+
+  /**
+   * @brief Initialise Telegram
+   */
+  void InitialiseTelegram();
+
+  /**
    * @brief Event WiFi Station connected
    */
   void onSTAConnected(const WiFiEventStationModeConnected &e /*String ssid, uint8 bssid[6], uint8 channel*/);
@@ -157,34 +188,10 @@ private:
   void onSTAGotIP(const WiFiEventStationModeGotIP &e /*IPAddress ip, IPAddress mask, IPAddress gw*/);
 
   /**
-   * @brief Initialise NTP
-   */
-  void InitialiseNTP();
-
-  /**
    * @brief Check time received via NTP
    */
   void checkNTP();
 
-  /**
-   * @brief Initialise Secure
-   */
-  void InitialiseSecure();
-
-  /**
-   * @brief Initialise MQTT
-   */
-  void InitialiseMQTT(MQTT_CALLBACK_SIGNATURE);
-
-  /**
-   * @brief Connect to MQTT server
-   */
-  void ConnectToMqtt();
-
-  /**
-   * @brief Initialise Telegram
-   */
-  void InitialiseTelegram();
 };
 
 #endif

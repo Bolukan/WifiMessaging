@@ -13,35 +13,18 @@ WifiMessaging::WifiMessaging(uint16_t connectionServices)
   DEBUG_WIFIMESSAGING_BEGIN();
 
   if (_connectionServices & ServiceWifi)
-  {
-    StatusWiFi = ConnectionInactive;
     InitialiseWiFi();
-  }
-
   if (_connectionServices & ServiceMQTT)
   {
-    StatusMQTT = ConnectionInactive;
-    //InitialiseMQTT();
-  }
-
+  } // InitialiseMQTT();  // "callback" triggers InitialiseMQTT
   if (_connectionServices & ServiceNTP)
-  {
-    StatusNTP = ConnectionInactive;
     InitialiseNTP();
-  }
-
-  // Started after NTP
   if (_connectionServices & ServiceSecure)
   {
-    StatusSecure = ConnectionInactive;
-    // InitialiseSecure();  // Started after NTP
-  }
-
+  } // InitialiseSecure();  // Started after NTP
   if (_connectionServices & ServiceTelegram)
   {
-    StatusTelegram = ConnectionInactive;
-    // InitialiseTelegram();  // Started after SecureClient
-  }
+  } // InitialiseTelegram();  // Started after SecureClient
 
   DEBUG_WIFIMESSAGING_PRINTF("WifiMessaging initialised\n");
 }
@@ -50,6 +33,38 @@ WifiMessaging::WifiMessaging(uint16_t connectionServices, MQTT_CALLBACK_SIGNATUR
     : WifiMessaging(connectionServices)
 {
   InitialiseMQTT(callback);
+}
+
+void WifiMessaging::loop()
+{
+  // New WiFi
+  if (StatusWiFi == ConnectionActiveNew)
+  {
+    StatusWiFi = ConnectionActive;
+    if ((_connectionServices & ServiceMQTT) && (StatusMQTT < ConnectionActive))
+      ConnectToMqtt();
+  }
+
+  // New NTP
+  if (StatusNTP == ConnectionActiveNew)
+  {
+    StatusNTP = ConnectionActive;
+    if ((_connectionServices & ServiceSecure) && (StatusSecure < ConnectionActive))
+    {
+      StatusSecure = ConnectionInactiveToActive;
+      InitialiseSecure();
+    }
+  }
+
+  // New Secure
+  if (StatusSecure == ConnectionActiveNew)
+  {
+    StatusSecure = ConnectionActive;
+    if ((_connectionServices & ServiceTelegram) && (StatusTelegram < ConnectionActive))
+    {
+      InitialiseTelegram();
+    }
+  }
 }
 
 uint16_t WifiMessaging::CheckConnectionServices(uint16_t connectionServices)
@@ -92,9 +107,17 @@ void WifiMessaging::InitialiseWiFi()
   e4 = WiFi.onStationModeGotIP(std::bind(&WifiMessaging::onSTAGotIP, this, std::placeholders::_1));
 }
 
+void WifiMessaging::InitialiseMQTT(MQTT_CALLBACK_SIGNATURE)
+{
+  DEBUG_WIFIMESSAGING_PRINTF("Initialised MQTT ...\n");
+  mqttClient.setClient(wifiClient);
+  mqttClient.setServer(MQTT_HOST, MQTT_PORT);
+  mqttClient.setCallback(callback);
+}
+
 void WifiMessaging::InitialiseNTP()
 {
-  DEBUG_WIFIMESSAGING_PRINTF("Initialise NTP ...\n");
+  DEBUG_WIFIMESSAGING_PRINTF("Initialised NTP ...\n");
   configTime(0, 0, TIME_NTPSERVER_1, TIME_NTPSERVER_2);
   setenv("TZ", TIME_ENV_TZ, /*overwrite*/ 1);
   tzset();
@@ -102,30 +125,9 @@ void WifiMessaging::InitialiseNTP()
   timechecker.attach_ms(500, std::bind(&WifiMessaging::checkNTP, this));
 }
 
-void WifiMessaging::checkNTP()
-{
-  time_t now = time(nullptr);
-  
-  if (StatusNTP != ConnectionActive && now > 24 * 3600)
-  {
-    StatusNTP = ConnectionActive;
-    timechecker.detach();
-
-    struct tm timeinfo;
-    localtime_r(&now, &timeinfo);
-    DEBUG_WIFIMESSAGING_PRINTF("Localtime: %s\n", asctime(&timeinfo));
-
-    if ((_connectionServices & ServiceSecure) && (StatusSecure != ConnectionActive))
-    {
-      StatusSecure = ConnectionInactiveToActive;
-      InitialiseSecure();
-    }
-  }
-}
-
 void WifiMessaging::InitialiseSecure()
 {
-  DEBUG_WIFIMESSAGING_PRINTF("Initialise Secure ...\n");
+  DEBUG_WIFIMESSAGING_PRINTF("Initialised Secure ...\n");
   // BearSSL::WiFiClientSecure secureClient;
   // BearSSL::X509List cert(CERTIFICATE_ROOT);
   // BearSSL::Session session; // session cache used to remember secret keys established with clients, to support session resumption.
@@ -133,34 +135,21 @@ void WifiMessaging::InitialiseSecure()
   secureClient.setSession(&session); // certificate session to have more performance with subsequent calls
   secureClient.setTrustAnchors(&cert);
 
-  StatusSecure = ConnectionActive;
-
-  if ((_connectionServices & ServiceTelegram) && (StatusTelegram != ConnectionActive))
-  {
-    InitialiseTelegram();
-  }
-}
-
-void WifiMessaging::InitialiseMQTT(MQTT_CALLBACK_SIGNATURE)
-{
-  DEBUG_WIFIMESSAGING_PRINTF("Initialise MQTT ...\n");
-  mqttClient = PubSubClient(wifiClient);
-  mqttClient.setServer(MQTT_HOST, MQTT_PORT);
-  mqttClient.setCallback(callback);
+  StatusSecure = ConnectionActiveNew;
 }
 
 void WifiMessaging::InitialiseTelegram()
 {
-  DEBUG_WIFIMESSAGING_PRINTF("Initialise Telegram (Emtpy) ...\n");
+  DEBUG_WIFIMESSAGING_PRINTF("Initialised Telegram (Emtpy) ...\n");
   StatusTelegram = ConnectionActive;
-  // bot(TELEGRAM_BOT, secureClient);
+  //bot(TELEGRAM_BOT, secureClient);
 }
 
 // ********************  WIFI  ********************
 
 void WifiMessaging::connectToWiFi()
 {
-  DEBUG_WIFIMESSAGING_PRINTF("Connect to WiFi ... ");
+  DEBUG_WIFIMESSAGING_PRINTF("Connect to WiFi ...\n");
   StatusWiFi = ConnectionInactiveToActive;
   // switch on the WiFi radio
   WiFi.forceSleepWake();
@@ -171,12 +160,11 @@ void WifiMessaging::connectToWiFi()
   // WiFi.setOutputPower(10);  // reduce RF output power, increase if it won't connect
   // WiFi.config(WIFI_STATICIP, WIFI_GATEWAY, WIFI_SUBNET);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  DEBUG_WIFIMESSAGING_PRINTF("Connected to WiFi\n");
 }
 
 void WifiMessaging::disconnectFromWiFi()
 {
-  DEBUG_WIFIMESSAGING_PRINTF("Disconnect from WiFi ... ");
+  DEBUG_WIFIMESSAGING_PRINTF("Disconnect from WiFi ...\n");
   StatusWiFi = ConnectionActiveToInactive;
   // Disconnect to wifi
   WiFi.disconnect(true);
@@ -185,7 +173,6 @@ void WifiMessaging::disconnectFromWiFi()
   WiFi.mode(WIFI_OFF);
   WiFi.forceSleepBegin();
   delay(5);
-  DEBUG_WIFIMESSAGING_PRINTF("Disconnected from WiFi\n");
 }
 
 // More events: https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/src/ESP8266WiFiGeneric.h
@@ -208,28 +195,10 @@ void WifiMessaging::onSTAGotIP(const WiFiEventStationModeGotIP &e /*IPAddress ip
 {
   DEBUG_WIFIMESSAGING_PRINTF("WiFi GotIP: localIP %s SubnetMask %s GatewayIP %s\n",
                              e.ip.toString().c_str(), e.mask.toString().c_str(), e.gw.toString().c_str());
-  StatusWiFi = ConnectionActive;
-
-  if (_connectionServices & ServiceMQTT)
-  {
-    StatusMQTT = ConnectionInactiveToActive;
-    ConnectToMqtt();
-  }
+  StatusWiFi = ConnectionActiveNew;
 }
 
-void WifiMessaging::ConnectToMqtt()
-{
-  String clientId = "ESP-" + macId();
-  if (mqttClient.connect(clientId.c_str()))
-  {
-    StatusMQTT = ConnectionActive;
-    DEBUG_WIFIMESSAGING_PRINTF("Connected to MQTT\n");
-  }
-  else
-  {
-    DEBUG_WIFIMESSAGING_PRINTF("Connection to MQTT failed\n");
-  }
-}
+// ********************  MQTT  ********************
 
 String WifiMessaging::macId()
 {
@@ -240,7 +209,52 @@ String WifiMessaging::macId()
   return String(macStr);
 }
 
+void WifiMessaging::ConnectToMqtt()
+{
+  StatusMQTT = ConnectionInactiveToActive;
+  String clientId = "ESP-" + macId();
+
+  if (!mqttClient.connected())
+  {
+    if (mqttClient.connect(clientId.c_str()))
+    {
+      StatusMQTT = ConnectionActive;
+      DEBUG_WIFIMESSAGING_PRINTF("Connected to MQTT as %s\n", clientId.c_str());
+    }
+    else
+    {
+      DEBUG_WIFIMESSAGING_PRINTF("MQTT connection failed\n");
+    }
+  }
+}
+
+// ********************  NTP  ********************
+
+void WifiMessaging::checkNTP()
+{
+  time_t now = time(nullptr);
+
+  if (StatusNTP < ConnectionActive && now > 24 * 3600)
+  {
+    StatusNTP = ConnectionActiveNew;
+    timechecker.detach();
+
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
+    DEBUG_WIFIMESSAGING_PRINTF("Localtime: %s", asctime(&timeinfo));
+  }
+}
+
+// ********************  TELEGRAM  ********************
+
 bool WifiMessaging::sendMessage(const String &text, const String &parse_mode)
 {
-  return bot.sendMessage(TELEGRAM_CHAT_ID, text, parse_mode);
+  if (StatusTelegram == ConnectionActive)
+  {
+    return bot.sendMessage(TELEGRAM_CHAT_ID, text, parse_mode);
+  }
+  else
+  {
+    return false;
+  }
 }
