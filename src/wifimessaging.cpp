@@ -70,7 +70,8 @@ void WifiMessaging::InitialiseWiFi()
   if (WiFi.getMode() != WIFI_OFF)
   {
     DEBUG_WIFIMESSAGING_PRINTF("WIFI NOT OFF: SHUTDOWN\n");
-    WiFi.mode(WIFI_SHUTDOWN);
+    // 2021-06-20 shutdown function changed, bodge change applied
+    WiFi.mode(WIFI_OFF);
     // Set WiFi Off
     if (WiFi.getMode() != WIFI_OFF)
     {
