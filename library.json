@@ -18,10 +18,10 @@
   "platforms": "espressif8266",
   "dependencies": [
     {
-      "name": "PubSubClient"
+      "name": "knolleary/PubSubClient"
     },
     {
-      "name": "UniversalTelegramBot"
+      "name": "witnessmenow/UniversalTelegramBot"
     }
   ],
   "build": {
