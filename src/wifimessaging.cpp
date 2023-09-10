@@ -46,204 +46,12 @@ WifiMessaging &WifiMessaging::instance() {
 // **                          WIFI events                                   **
 // ****************************************************************************
 
-#ifdef ESP8266
-
-void WifiMessaging::onSTAConnected(const WiFiEventStationModeConnected &e /*String ssid, uint8 bssid[6], uint8 channel*/) {
-  DEBUG_WIFIMESSAGING_PRINTF(
-      "WiFi Connected: SSID %s @ BSSID %.2X:%.2X:%.2X:%.2X:%.2X:%.2X Channel "
-      "%d\n",
-      e.ssid.c_str(), e.bssid[0], e.bssid[1], e.bssid[2], e.bssid[3],
-      e.bssid[4], e.bssid[5], e.channel);
-}
-
-void WifiMessaging::onSTADisconnected(const WiFiEventStationModeDisconnected &e /*String ssid, uint8 bssid[6], WiFiDisconnectReason reason*/) {
-  // Reason:
-  // https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/src/ESP8266WiFiType.h
-  DEBUG_WIFIMESSAGING_PRINTF(
-      "WiFi Disconnected: SSID %s BSSID %.2X:%.2X:%.2X:%.2X:%.2X:%.2X Reason "
-      "%d\n",
-      e.ssid.c_str(), e.bssid[0], e.bssid[1], e.bssid[2], e.bssid[3],
-      e.bssid[4], e.bssid[5], e.reason);
-  StatusWiFi = ConnectionInactive;
-}
-
-void WifiMessaging::onSTAGotIP(const WiFiEventStationModeGotIP &e /*IPAddress ip, IPAddress mask, IPAddress gw*/) {
-  DEBUG_WIFIMESSAGING_PRINTF(
-      "WiFi GotIP: localIP %s SubnetMask %s GatewayIP %s\n",
-      e.ip.toString().c_str(), e.mask.toString().c_str(),
-      e.gw.toString().c_str());
-  StatusWiFi = ConnectionActiveNew;
-}
-
-#elif ESP32
-
-// https://github.com/espressif/arduino-esp32/blob/master/tools/sdk/esp32s2/include/esp_event/include/esp_event_legacy.h
-void WifiMessaging::wifi_event_handler_static(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
-  switch (event_id) {
-    case SYSTEM_EVENT_STA_CONNECTED:
-      return WifiMessaging::instance().onSTAConnected(arg, event_base, event_id, event_data);
-      break;
-    case SYSTEM_EVENT_STA_DISCONNECTED:
-      return WifiMessaging::instance().onSTADisconnected(arg, event_base, event_id, event_data);
-      break;
-    case SYSTEM_EVENT_STA_GOT_IP:
-      return WifiMessaging::instance().onSTAGotIP(arg, event_base, event_id, event_data);
-      break;
-    default:
-      DEBUG_WIFIMESSAGING_PRINTF("Other WiFi event");
-      return;
-      break;
-  }
-}
-
-void WifiMessaging::onSTAConnected(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
-  /* 
-    uint8_t ssid[32];           // SSID of connected AP
-    uint8_t ssid_len;           // SSID length of connected AP
-    uint8_t bssid[6];           // BSSID of connected AP
-    uint8_t channel;            // channel of connected AP
-    wifi_auth_mode_t authmode;  // authentication mode used by AP
-  */
-  wifi_event_sta_connected_t *event = (wifi_event_sta_connected_t *)event_data;
-
-  DEBUG_WIFIMESSAGING_PRINTF(
-      "WiFi Connected: SSID %.*s @ BSSID %.2X:%.2X:%.2X:%.2X:%.2X:%.2X Channel %d\n",
-      event->ssid_len, event->ssid, 
-      event->bssid[0], event->bssid[1], event->bssid[2], event->bssid[3], event->bssid[4], event->bssid[5], 
-      event->channel
-  );
-}
-
-void WifiMessaging::onSTADisconnected(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
-  /* 
-    uint8_t ssid[32];         // SSID of disconnected AP
-    uint8_t ssid_len;         // SSID length of disconnected AP
-    uint8_t bssid[6];         // BSSID of disconnected AP
-    uint8_t reason;           // reason of disconnection
-    int8_t  rssi;             // rssi of disconnection
-  */
-  wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *)event_data;
-
-  DEBUG_WIFIMESSAGING_PRINTF(
-      "WiFi Disconnected: SSID %.*s BSSID %.2X:%.2X:%.2X:%.2X:%.2X:%.2X Reason %d\n",
-      event->ssid_len, event->ssid,
-      event->bssid[0], event->bssid[1], event->bssid[2], event->bssid[3], event->bssid[4], event->bssid[5],
-      event->reason
-  );
-  
-  StatusWiFi = ConnectionInactive;
-
-}
-
-void WifiMessaging::onSTAGotIP(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
-  /*
-    int if_index;                    //< Interface index for which the event is received (left for legacy compilation)
-    esp_netif_t *esp_netif;          //< Pointer to corresponding esp-netif object
-    esp_netif_ip_info_t ip_info;     //< IP address, netmask, gatway IP address
-    bool ip_changed;                 //< Whether the assigned IP has changed or not
-
-  */
-  ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-
-  uint32_t ip = event->ip_info.ip.addr;
-  uint32_t nm = event->ip_info.netmask.addr;
-  uint32_t gw = event->ip_info.gw.addr;
-
-  DEBUG_WIFIMESSAGING_PRINTF(
-      "WiFi GotIP: localIP %d.%d.%d.%d SubnetMask %d.%d.%d.%d GatewayIP %d.%d.%d.%d\n",
-      (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF, 
-      (nm >> 24) & 0xFF, (nm >> 16) & 0xFF, (nm >> 8) & 0xFF, nm & 0xFF, 
-      (gw >> 24) & 0xFF, (gw >> 16) & 0xFF, (gw >> 8) & 0xFF, gw & 0xFF
-  );
-  
-  StatusWiFi = ConnectionActiveNew;
-
-}
-
-#endif
-
-void WifiMessaging::SetMQTT(const char *mqtt_host, uint16_t mqqt_port,
-                            MQTT_CALLBACK_SIGNATURE) {
-  AddConnectionService(WifiMessaging::connectionService::ServiceMQTT);
-  this->mqqt_hostdomain = mqtt_host;
-  this->mqtt_hostip = IPAddress(0, 0, 0, 0);
-  this->mqqt_port = mqqt_port;
-  InitialiseMQTT(callback);
-}
-
-void WifiMessaging::SetMQTT(IPAddress mqtt_hostip, uint16_t mqqt_port,
-                            MQTT_CALLBACK_SIGNATURE) {
-  AddConnectionService(WifiMessaging::connectionService::ServiceMQTT);
-  this->mqqt_hostdomain = nullptr;
-  this->mqtt_hostip = mqtt_hostip;
-  this->mqqt_port = mqqt_port;
-  InitialiseMQTT(callback);
-}
-
-//    bot(TELEGRAM_BOT, secureClient)
-void WifiMessaging::SetTelegram(const char *telegram_bot,
-                                const char *telegram_chat_id) {
-  AddConnectionService(WifiMessaging::connectionService::ServiceTelegram);
-  this->telegram_bot = telegram_bot;
-  this->telegram_chat_id = telegram_chat_id;
-  this->bot = new UniversalTelegramBot(telegram_bot, this->secureClient);
-}
-
-void WifiMessaging::loop() {
-  // New WiFi
-  if (StatusWiFi == ConnectionActiveNew) {
-    StatusWiFi = ConnectionActive;
-    if ((connectionServices & ServiceMQTT) && (StatusMQTT < ConnectionActive))
-      ConnectToMqtt();
-    if ((connectionServices & ServiceNTP) && (StatusNTP < ConnectionActive))
-      InitialiseNTP();
-  }
-
-  // New NTP
-  if (StatusNTP == ConnectionActiveNew) {
-    StatusNTP = ConnectionActive;
-    if ((connectionServices & ServiceSecure) &&
-        (StatusSecure < ConnectionActive)) {
-      InitialiseSecure();
-    }
-  }
-
-  // New Secure
-  if (StatusSecure == ConnectionActiveNew) {
-    StatusSecure = ConnectionActive;
-    if ((connectionServices & ServiceTelegram) &&
-        (StatusTelegram < ConnectionActive)) {
-      InitialiseTelegram();
-    }
-  }
-}
-
-uint16_t WifiMessaging::AddConnectionService(uint16_t connectionService) {
-  this->connectionServices |= connectionService;
-
-  // include Secure to use Telegram
-  if (this->connectionServices & ServiceTelegram)
-    this->connectionServices |= ServiceSecure;
-
-  // include WiFi and NTP to use Secure
-  if (this->connectionServices & ServiceSecure)
-    this->connectionServices |= (ServiceWifi | ServiceNTP);
-
-  // include WiFi to use NTP
-  if (this->connectionServices & ServiceNTP)
-    this->connectionServices |= ServiceWifi;
-
-  // include Wifi to use MQTT
-  if (connectionServices & ServiceMQTT) this->connectionServices |= ServiceWifi;
-
-  return this->connectionServices;
-}
-
 /**
  * @brief Initialise WiFi: WiFi off and events set
  * 
  */
 void WifiMessaging::InitialiseWiFi() {
+  DEBUG_WIFIMESSAGING_PRINTF("Initalising WiFi");
 #ifdef ESP8266
 
   if (WiFi.getMode() != WIFI_OFF) {
@@ -278,17 +86,228 @@ void WifiMessaging::InitialiseWiFi() {
   if (WiFi.getMode() != WIFI_OFF) {
     WiFi.disconnect(true);  // Disconnect and set WiFi mode to OFF
   }
-  
-  esp_event_handler_instance_register(WIFI_EVENT, SYSTEM_EVENT_STA_CONNECTED,
-                                      &wifi_event_handler_static, NULL, &wifi_event_handler_stationConnected);
-  esp_event_handler_instance_register(WIFI_EVENT, SYSTEM_EVENT_STA_DISCONNECTED,
-                                      &wifi_event_handler_static, NULL, &wifi_event_handler_stationDisconnected);
-  esp_event_handler_instance_register(WIFI_EVENT, SYSTEM_EVENT_STA_GOT_IP,
-                                      &wifi_event_handler_static, NULL, &wifi_event_handler_stationGotIP);
+  WiFi.onEvent(wifi_event_handler_static);
 
 #endif
 
   DEBUG_WIFIMESSAGING_PRINTF("Initialised WiFi ...\n");
+}
+
+// EVENTS
+
+#ifdef ESP8266
+
+void WifiMessaging::onSTAConnected(const WiFiEventStationModeConnected &e /*String ssid, uint8 bssid[6], uint8 channel*/) {
+  DEBUG_WIFIMESSAGING_PRINTF(
+      "WiFi Connected: SSID %s @ BSSID %.2X:%.2X:%.2X:%.2X:%.2X:%.2X Channel "
+      "%d\n",
+      e.ssid.c_str(), e.bssid[0], e.bssid[1], e.bssid[2], e.bssid[3],
+      e.bssid[4], e.bssid[5], e.channel);
+}
+
+void WifiMessaging::onSTADisconnected(const WiFiEventStationModeDisconnected &e /*String ssid, uint8 bssid[6], WiFiDisconnectReason reason*/) {
+  // Reason:
+  // https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/src/ESP8266WiFiType.h
+  DEBUG_WIFIMESSAGING_PRINTF(
+      "WiFi Disconnected: SSID %s BSSID %.2X:%.2X:%.2X:%.2X:%.2X:%.2X Reason "
+      "%d\n",
+      e.ssid.c_str(), e.bssid[0], e.bssid[1], e.bssid[2], e.bssid[3],
+      e.bssid[4], e.bssid[5], e.reason);
+  StatusWiFi = ConnectionInactive;
+}
+
+void WifiMessaging::onSTAGotIP(const WiFiEventStationModeGotIP &e /*IPAddress ip, IPAddress mask, IPAddress gw*/) {
+  DEBUG_WIFIMESSAGING_PRINTF(
+      "WiFi GotIP: localIP %s SubnetMask %s GatewayIP %s\n",
+      e.ip.toString().c_str(), e.mask.toString().c_str(),
+      e.gw.toString().c_str());
+  StatusWiFi = ConnectionActiveNew;
+}
+
+#elif ESP32
+
+// https://github.com/espressif/arduino-esp32/blob/master/tools/sdk/esp32s2/include/esp_event/include/esp_event_legacy.h
+void WifiMessaging::wifi_event_handler_static(WiFiEvent_t event, WiFiEventInfo_t info)
+{
+  DEBUG_WIFIMESSAGING_PRINTF("[WiFi-event] event: %d\n", event);
+
+    switch (event) {
+        case ARDUINO_EVENT_WIFI_READY: // 0
+            Serial.println("WiFi interface ready");
+            break;
+        case ARDUINO_EVENT_WIFI_STA_START: // 2
+            Serial.println("WiFi client started");
+            break;
+        case ARDUINO_EVENT_WIFI_STA_CONNECTED: // 4
+            WifiMessaging::instance().onSTAConnected(event, info);
+            break;
+        case ARDUINO_EVENT_WIFI_STA_DISCONNECTED: // 5
+            WifiMessaging::instance().onSTADisconnected(event, info);
+            break;
+        case ARDUINO_EVENT_WIFI_STA_GOT_IP: // 7
+            WifiMessaging::instance().onSTAGotIP(event,info);
+            break;
+        default: break;
+    }
+}
+
+void WifiMessaging::onSTAConnected(WiFiEvent_t event, WiFiEventInfo_t info) {
+  /* 
+    uint8_t ssid[32];           // SSID of connected AP
+    uint8_t ssid_len;           // SSID length of connected AP
+    uint8_t bssid[6];           // BSSID of connected AP
+    uint8_t channel;            // channel of connected AP
+    wifi_auth_mode_t authmode;  // authentication mode used by AP
+  */
+  wifi_event_sta_connected_t e = info.wifi_sta_connected;
+
+  DEBUG_WIFIMESSAGING_PRINTF(
+      "WiFi Connected: SSID %.*s @ BSSID %.2X:%.2X:%.2X:%.2X:%.2X:%.2X Channel %d\n",
+      e.ssid_len, e.ssid, 
+      e.bssid[0], e.bssid[1], e.bssid[2], e.bssid[3], e.bssid[4], e.bssid[5], 
+      e.channel
+  );
+}
+
+void WifiMessaging::onSTADisconnected(WiFiEvent_t event, WiFiEventInfo_t info) {
+  /* 
+    uint8_t ssid[32];         // SSID of disconnected AP
+    uint8_t ssid_len;         // SSID length of disconnected AP
+    uint8_t bssid[6];         // BSSID of disconnected AP
+    uint8_t reason;           // reason of disconnection
+    int8_t  rssi;             // rssi of disconnection
+  */
+  wifi_event_sta_disconnected_t e = info.wifi_sta_disconnected;
+
+  DEBUG_WIFIMESSAGING_PRINTF(
+      "WiFi Disconnected: SSID %.*s BSSID %.2X:%.2X:%.2X:%.2X:%.2X:%.2X Reason %d\n",
+      e.ssid_len, e.ssid,
+      e.bssid[0], e.bssid[1], e.bssid[2], e.bssid[3], e.bssid[4], e.bssid[5],
+      e.reason
+  );
+  
+  StatusWiFi = ConnectionInactive;
+
+}
+
+void WifiMessaging::onSTAGotIP(WiFiEvent_t event, WiFiEventInfo_t info) {
+  /*
+    int if_index;                    //< Interface index for which the event is received (left for legacy compilation)
+    esp_netif_t *esp_netif;          //< Pointer to corresponding esp-netif object
+    esp_netif_ip_info_t ip_info;     //< IP address, netmask, gatway IP address
+    bool ip_changed;                 //< Whether the assigned IP has changed or not
+  */
+  ip_event_got_ip_t e = info.got_ip;
+
+  uint32_t ip = e.ip_info.ip.addr;
+  uint32_t nm = e.ip_info.netmask.addr;
+  uint32_t gw = e.ip_info.gw.addr;
+
+  DEBUG_WIFIMESSAGING_PRINTF(
+      "WiFi GotIP: localIP %d.%d.%d.%d SubnetMask %d.%d.%d.%d GatewayIP %d.%d.%d.%d\n",
+      (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF, 
+      (nm >> 24) & 0xFF, (nm >> 16) & 0xFF, (nm >> 8) & 0xFF, nm & 0xFF, 
+      (gw >> 24) & 0xFF, (gw >> 16) & 0xFF, (gw >> 8) & 0xFF, gw & 0xFF
+  );
+  
+  StatusWiFi = ConnectionActiveNew;
+
+}
+
+#endif
+
+// ****************************************************************************
+// **                          MQTT                                          **
+// ****************************************************************************
+
+void WifiMessaging::SetMQTT(const char *mqtt_host, uint16_t mqqt_port,
+                            MQTT_CALLBACK_SIGNATURE) {
+  AddConnectionService(WifiMessaging::connectionService::ServiceMQTT);
+  this->mqqt_hostdomain = mqtt_host;
+  this->mqtt_hostip = IPAddress(0, 0, 0, 0);
+  this->mqqt_port = mqqt_port;
+  InitialiseMQTT(callback);
+}
+
+void WifiMessaging::SetMQTT(IPAddress mqtt_hostip, uint16_t mqqt_port,
+                            MQTT_CALLBACK_SIGNATURE) {
+  AddConnectionService(WifiMessaging::connectionService::ServiceMQTT);
+  this->mqqt_hostdomain = nullptr;
+  this->mqtt_hostip = mqtt_hostip;
+  this->mqqt_port = mqqt_port;
+  InitialiseMQTT(callback);
+}
+
+// ****************************************************************************
+// **                          TELEGRAM                                      **
+// ****************************************************************************
+
+//    bot(TELEGRAM_BOT, secureClient)
+void WifiMessaging::SetTelegram(const char *telegram_bot,
+                                const char *telegram_chat_id) {
+  AddConnectionService(WifiMessaging::connectionService::ServiceTelegram);
+  this->telegram_bot = telegram_bot;
+  this->telegram_chat_id = telegram_chat_id;
+  this->bot = new UniversalTelegramBot(telegram_bot, this->secureClient);
+}
+
+// ****************************************************************************
+// **                          LOOP                                          **
+// ****************************************************************************
+
+void WifiMessaging::loop() {
+  // New WiFi
+  if (StatusWiFi == ConnectionActiveNew) {
+    StatusWiFi = ConnectionActive;
+    if ((connectionServices & ServiceMQTT) && (StatusMQTT < ConnectionActive))
+      ConnectToMqtt();
+    if ((connectionServices & ServiceNTP) && (StatusNTP < ConnectionActive))
+      InitialiseNTP();
+  }
+
+  // New NTP
+  if (StatusNTP == ConnectionActiveNew) {
+    StatusNTP = ConnectionActive;
+    if ((connectionServices & ServiceSecure) &&
+        (StatusSecure < ConnectionActive)) {
+      InitialiseSecure();
+    }
+  }
+
+  // New Secure
+  if (StatusSecure == ConnectionActiveNew) {
+    StatusSecure = ConnectionActive;
+    if ((connectionServices & ServiceTelegram) &&
+        (StatusTelegram < ConnectionActive)) {
+      InitialiseTelegram();
+    }
+  }
+
+  // New Telegram
+  if (StatusTelegram == ConnectionActiveNew) {
+    StatusTelegram = ConnectionActive;
+  }
+}
+
+uint16_t WifiMessaging::AddConnectionService(uint16_t connectionService) {
+  this->connectionServices |= connectionService;
+
+  // include Secure to use Telegram
+  if (this->connectionServices & ServiceTelegram)
+    this->connectionServices |= ServiceSecure;
+
+  // include WiFi and NTP to use Secure
+  if (this->connectionServices & ServiceSecure)
+    this->connectionServices |= (ServiceWifi | ServiceNTP);
+
+  // include WiFi to use NTP
+  if (this->connectionServices & ServiceNTP)
+    this->connectionServices |= ServiceWifi;
+
+  // include Wifi to use MQTT
+  if (connectionServices & ServiceMQTT) this->connectionServices |= ServiceWifi;
+
+  return this->connectionServices;
 }
 
 void WifiMessaging::InitialiseMQTT(MQTT_CALLBACK_SIGNATURE) {
@@ -320,10 +339,12 @@ void WifiMessaging::InitialiseSecure() {
   secureClient.setCACert(CERTIFICATE_ROOT);
 #endif
   DEBUG_WIFIMESSAGING_PRINTF("Initialised Secure ...\n");
+  StatusSecure = ConnectionActiveNew;
 }
 
 void WifiMessaging::InitialiseTelegram() {
   DEBUG_WIFIMESSAGING_PRINTF("Initialised Telegram ...\n");
+  StatusTelegram = ConnectionActiveNew;
 }
 
 // ********************  WIFI  ********************
@@ -340,8 +361,8 @@ void WifiMessaging::connectToWiFi() {
   WiFi.persistent(false);
   // WiFi.setOutputPower(10);  // reduce RF output power, increase if it won't
   // connect
-#endif
   WiFi.mode(WIFI_STA);
+#endif
   WiFi.begin(this->wifi_ssid, this->wifi_password);
 }
 

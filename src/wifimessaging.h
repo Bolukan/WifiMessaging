@@ -4,25 +4,24 @@
 #include <Arduino.h>
 
 #ifdef ESP8266
-#include <ESP8266WiFi.h>  // Arduino library - https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/src/ESP8266WiFi.h
-#include <Ticker.h>  // Arduino library - https://github.com/esp8266/Arduino/blob/master/libraries/Ticker/src/Ticker.h
+#include <ESP8266WiFi.h>       // Arduino library - https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/src/ESP8266WiFi.h
+#include <Ticker.h>            // Arduino library - https://github.com/esp8266/Arduino/blob/master/libraries/Ticker/src/Ticker.h
 #include <WiFiClientSecure.h>  // Arduino library - https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/src/WiFiClientSecure.h
-#include <time.h>  // Arduino library - https://github.com/esp8266/Arduino/blob/master/tools/sdk/libc/xtensa-lx106-elf/include/time.h
+#include <time.h>              // Arduino library - https://github.com/esp8266/Arduino/blob/master/tools/sdk/libc/xtensa-lx106-elf/include/time.h
 
 #elif ESP32
-#include <Ticker.h>  //                   https://github.com/espressif/arduino-esp32/blob/master/libraries/Ticker/src/Ticker.h
+#include <Ticker.h>            //                   https://github.com/espressif/arduino-esp32/blob/master/libraries/Ticker/src/Ticker.h
 #include <WiFi.h>
 #include <WiFiClientSecure.h>  // Arduino library - https://github.com/espressif/arduino-esp32/blob/master/libraries/WiFiClientSecure/src/WiFiClientSecure.h
-#include <time.h>  // https://github.com/espressif/arduino-esp32/blob/master/tools/sdk/esp32/include/newlib/platform_include/time.h
+#include <time.h>              //                   https://github.com/espressif/arduino-esp32/blob/master/tools/sdk/esp32/include/newlib/platform_include/time.h
 
 #endif
 
 #include <Certificate_telegram.h>
-#include <PubSubClient.h>  // 89              - https://github.com/knolleary/pubsubclient.git
+#include <PubSubClient.h>          // 89              - https://github.com/knolleary/pubsubclient.git
 #include <UniversalTelegramBot.h>  // 1262            - https://github.com/witnessmenow/Universal-Arduino-Telegram-Bot.git
 
-// **************************************** DEBUG
-// ****************************************
+// **************************************** DEBUG ****************************************
 
 // Uncomment lines below to receive debug messages via Serial
 #define DEBUG_WIFIMESSAGING_TO_SERIAL 1
@@ -52,9 +51,8 @@
 #define DEBUG_WIFIMESSAGING_FLUSH()
 #endif
 
-// **************************************** CLASS
-// **************************************** WifiMessaging(ServiceWifi |
-// ServiceNTP | ServiceSecure | ServiceMQTT | ServiceTelegram);
+// **************************************** CLASS **************************************** 
+// WifiMessaging(ServiceWifi | ServiceNTP | ServiceSecure | ServiceMQTT | ServiceTelegram);
 // WifiMessaging.InitialiseMQTT(callback);
 // WifiMessaging.connectToWiFi();
 
@@ -102,8 +100,7 @@ class WifiMessaging {
    * @param mqtt_port mqtt port
    * @param callback function for received messages
    */
-  void SetMQTT(const char *mqtt_host, uint16_t mqtt_port,
-               MQTT_CALLBACK_SIGNATURE);
+  void SetMQTT(const char *mqtt_host, uint16_t mqtt_port, MQTT_CALLBACK_SIGNATURE);
 
   /**
    * @brief Set MQTT parameters
@@ -112,8 +109,7 @@ class WifiMessaging {
    * @param mqqt_port
    * @param callback function for received messages
    */
-  void SetMQTT(IPAddress mqtt_hostip, uint16_t mqqt_port,
-               MQTT_CALLBACK_SIGNATURE);
+  void SetMQTT(IPAddress mqtt_hostip, uint16_t mqqt_port, MQTT_CALLBACK_SIGNATURE);
 
   /**
    * @brief Set the Telegram object
@@ -156,14 +152,7 @@ class WifiMessaging {
 
 #ifdef ESP32
 
-  static void wifi_event_handler_static(void *arg, esp_event_base_t event_base,
-                                        int32_t event_id, void *event_data);
-
-  /**
-   * @brief Event WiFi Station
-   */
-  void wifi_event_handler(void *arg, esp_event_base_t event_base,
-                          int32_t event_id, void *event_data);
+  static void wifi_event_handler_static(WiFiEvent_t event, WiFiEventInfo_t info);
 
 #endif
 
@@ -188,9 +177,7 @@ class WifiMessaging {
   WiFiEventHandler e2;  ///< event onStationModeDisconnected
   WiFiEventHandler e4;  ///< event onStationModeGotIP
 #elif ESP32
-  esp_event_handler_instance_t wifi_event_handler_stationConnected;
-  esp_event_handler_instance_t wifi_event_handler_stationDisconnected;
-  esp_event_handler_instance_t wifi_event_handler_stationGotIP;
+
 #endif
 
   // MQTT
@@ -205,9 +192,8 @@ class WifiMessaging {
   // Secure
   BearSSL::WiFiClientSecure secureClient;
   BearSSL::X509List cert;
-  BearSSL::Session
-      session;  // session cache used to remember secret keys established with
-                // clients, to support session resumption.
+  BearSSL::Session session;  
+  // session cache used to remember secret keys established with clients, to support session resumption.
 #elif ESP32
   WiFiClientSecure secureClient;
 #endif
@@ -278,9 +264,9 @@ class WifiMessaging {
   void onSTAGotIP(const WiFiEventStationModeGotIP &e /*IPAddress ip, IPAddress mask, IPAddress gw*/);
 
 #elif ESP32
-  void  onSTAConnected(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
-  void  onSTADisconnected(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
-  void  onSTAGotIP(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+  void  onSTAConnected(WiFiEvent_t event, WiFiEventInfo_t info);
+  void  onSTADisconnected(WiFiEvent_t event, WiFiEventInfo_t info);
+  void  onSTAGotIP(WiFiEvent_t event, WiFiEventInfo_t info);
 
 #endif
 
