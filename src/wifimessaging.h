@@ -2,16 +2,27 @@
 #define WIFIMESSAGING_H
 
 #include <Arduino.h>
-#include <Ticker.h>
-#include <secrets.h>
-#include <certificate.h>
-#include <ESP8266WiFi.h>      // Arduino library - https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/src/ESP8266WiFi.h
-#include <PubSubClient.h>     // 89              - https://github.com/knolleary/pubsubclient.git
-#include <time.h>             // Arduino library - https://github.com/esp8266/Arduino/blob/master/tools/sdk/libc/xtensa-lx106-elf/include/time.h
-#include <WiFiClientSecure.h> // Arduino library - https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/src/WiFiClientSecure.h
-#include <UniversalTelegramBot.h> // 1262
 
-// **************************************** DEBUG ****************************************
+#ifdef ESP8266
+#include <ESP8266WiFi.h>  // Arduino library - https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/src/ESP8266WiFi.h
+#include <Ticker.h>  // Arduino library - https://github.com/esp8266/Arduino/blob/master/libraries/Ticker/src/Ticker.h
+#include <WiFiClientSecure.h>  // Arduino library - https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/src/WiFiClientSecure.h
+#include <time.h>  // Arduino library - https://github.com/esp8266/Arduino/blob/master/tools/sdk/libc/xtensa-lx106-elf/include/time.h
+
+#elif ESP32
+#include <Ticker.h>  //                   https://github.com/espressif/arduino-esp32/blob/master/libraries/Ticker/src/Ticker.h
+#include <WiFi.h>
+#include <WiFiClientSecure.h>  // Arduino library - https://github.com/espressif/arduino-esp32/blob/master/libraries/WiFiClientSecure/src/WiFiClientSecure.h
+#include <time.h>  // https://github.com/espressif/arduino-esp32/blob/master/tools/sdk/esp32/include/newlib/platform_include/time.h
+
+#endif
+
+#include <Certificate_telegram.h>
+#include <PubSubClient.h>  // 89              - https://github.com/knolleary/pubsubclient.git
+#include <UniversalTelegramBot.h>  // 1262            - https://github.com/witnessmenow/Universal-Arduino-Telegram-Bot.git
+
+// **************************************** DEBUG
+// ****************************************
 
 // Uncomment lines below to receive debug messages via Serial
 #define DEBUG_WIFIMESSAGING_TO_SERIAL 1
@@ -41,28 +52,25 @@
 #define DEBUG_WIFIMESSAGING_FLUSH()
 #endif
 
-// **************************************** CLASS ****************************************
-// WifiMessaging(ServiceWifi | ServiceNTP | ServiceSecure | ServiceMQTT | ServiceTelegram);
+// **************************************** CLASS
+// **************************************** WifiMessaging(ServiceWifi |
+// ServiceNTP | ServiceSecure | ServiceMQTT | ServiceTelegram);
 // WifiMessaging.InitialiseMQTT(callback);
 // WifiMessaging.connectToWiFi();
 
 /**
  * WiFi and messaging class (h).
  */
-class WifiMessaging
-{
-public:
-  enum connectionStatus
-  {
+class WifiMessaging {
+ public:
+  enum connectionStatus {
     ConnectionInactive = 0,
-    ConnectionActiveToInactive = 1,
-    ConnectionInactiveToActive = 2,
-    ConnectionActive = 3,
-    ConnectionActiveNew = 4
+    ConnectionInBetween = 1,
+    ConnectionActive = 2,
+    ConnectionActiveNew = 3
   };
 
-  enum connectionService : uint16_t
-  {
+  enum connectionService : uint16_t {
     ServiceWifi = 1,
     ServiceNTP = 2,
     ServiceSecure = 4,
@@ -76,25 +84,43 @@ public:
   connectionStatus StatusSecure = ConnectionInactive;
   connectionStatus StatusTelegram = ConnectionInactive;
 
-  WiFiClient wifiClient; ///< WifiClient object
-
-  PubSubClient mqttClient; ///< PubSubClient object
-
-  Ticker timechecker;
-
-  BearSSL::WiFiClientSecure secureClient;
-  BearSSL::X509List cert;
-  BearSSL::Session session; // session cache used to remember secret keys established with clients, to support session resumption.
+  // MQTT
+  PubSubClient mqttClient;  ///< PubSubClient object
 
   /**
-   * @brief WifiMessaging constructor
+   * @brief Construct a new Wifi Messaging object
+   *
+   * @param wifi_ssid Service Set Identifier
+   * @param wifi_password Password of the SSID Network
    */
-  WifiMessaging(uint16_t connectionServices);
+  WifiMessaging(const char *wifi_ssid, const char *wifi_password);
 
   /**
-   * @brief WifiMessaging constructor with MQTT
+   * @brief Set MQTT parameters
+   *
+   * @param mqtt_host mqtt host
+   * @param mqtt_port mqtt port
+   * @param callback function for received messages
    */
-  WifiMessaging(uint16_t connectionServices, MQTT_CALLBACK_SIGNATURE);
+  void SetMQTT(const char *mqtt_host, uint16_t mqtt_port,
+               MQTT_CALLBACK_SIGNATURE);
+
+  /**
+   * @brief Set MQTT parameters
+   *
+   * @param mqtt_hostip
+   * @param mqqt_port
+   * @param callback function for received messages
+   */
+  void SetMQTT(IPAddress mqtt_hostip, uint16_t mqqt_port,
+               MQTT_CALLBACK_SIGNATURE);
+
+  /**
+   * @brief Set the Telegram object
+   *
+   * @param telegram_bot The telegram bot code
+   */
+  void SetTelegram(const char *telegram_bot, const char *telegram_chat_id);
 
   /**
    * @brief Act on situation
@@ -121,19 +147,79 @@ public:
    */
   bool sendMessage(const String &text, const String &parse_mode);
 
-private:
-  uint16_t _connectionServices = ServiceWifi | ServiceNTP | ServiceSecure | ServiceMQTT | ServiceTelegram;
+  /**
+   * @brief return static object of this class
+   *
+   * @return WifiMessaging&
+   */
+  static WifiMessaging &instance();
+
+#ifdef ESP32
+
+  static void wifi_event_handler_static(void *arg, esp_event_base_t event_base,
+                                        int32_t event_id, void *event_data);
+
+  /**
+   * @brief Event WiFi Station
+   */
+  void wifi_event_handler(void *arg, esp_event_base_t event_base,
+                          int32_t event_id, void *event_data);
+
+#endif
+
+ private:
+  /**
+   * @brief Intended connection services, set if constants connection service
+   * are set ServiceWifi | ServiceNTP | ServiceSecure | ServiceMQTT |
+   * ServiceTelegram
+   *
+   */
+  uint16_t connectionServices = ServiceWifi;
 
   // WiFi
-  WiFiEventHandler e1;
-  WiFiEventHandler e2;
-  WiFiEventHandler e4;
+  const char *wifi_ssid;      ///< Wifi SSID
+  const char *wifi_password;  ///< WiFi password
+  WiFiClient wifiClient;      ///< WifiClient object
+  
+  static WifiMessaging *_wifimessaging;
+  
+#ifdef ESP8266
+  WiFiEventHandler e1;  ///< event onStationModeConnected
+  WiFiEventHandler e2;  ///< event onStationModeDisconnected
+  WiFiEventHandler e4;  ///< event onStationModeGotIP
+#elif ESP32
+  esp_event_handler_instance_t wifi_event_handler_stationConnected;
+  esp_event_handler_instance_t wifi_event_handler_stationDisconnected;
+  esp_event_handler_instance_t wifi_event_handler_stationGotIP;
+#endif
 
-  UniversalTelegramBot bot;
+  // MQTT
+  IPAddress mqtt_hostip;
+  const char *mqqt_hostdomain;
+  uint16_t mqqt_port;
+
+  // NTP
+  Ticker timechecker;
+
+#ifdef ESP8266
+  // Secure
+  BearSSL::WiFiClientSecure secureClient;
+  BearSSL::X509List cert;
+  BearSSL::Session
+      session;  // session cache used to remember secret keys established with
+                // clients, to support session resumption.
+#elif ESP32
+  WiFiClientSecure secureClient;
+#endif
+
+  // Telegram
+  const char *telegram_bot;
+  const char *telegram_chat_id;
+  UniversalTelegramBot *bot;
 
   /**
    * @brief Congruent combination of connection services
-   * 
+   *
    *  WiFi
    *   |-- MQTT (Insecure)
    *   |-- NTP (Time)
@@ -142,8 +228,10 @@ private:
    */
   uint16_t CheckConnectionServices(uint16_t connectionServices);
 
+  uint16_t AddConnectionService(uint16_t connectionService);
+
   /**
-   * @brief Initialise WiFi
+   * @brief Initialise WiFi: WiFi off and events set
    */
   void InitialiseWiFi();
 
@@ -172,6 +260,8 @@ private:
    */
   void InitialiseTelegram();
 
+#ifdef ESP8266
+
   /**
    * @brief Event WiFi Station connected
    */
@@ -187,11 +277,17 @@ private:
    */
   void onSTAGotIP(const WiFiEventStationModeGotIP &e /*IPAddress ip, IPAddress mask, IPAddress gw*/);
 
+#elif ESP32
+  void  onSTAConnected(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+  void  onSTADisconnected(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+  void  onSTAGotIP(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+
+#endif
+
   /**
    * @brief Check time received via NTP
    */
   void checkNTP();
-
 };
 
 #endif
