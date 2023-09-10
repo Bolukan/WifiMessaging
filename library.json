@@ -18,9 +18,11 @@
   "platforms": "espressif8266",
   "dependencies": [
     {
+      "owner": "knolleary",
       "name": "PubSubClient"
     },
     {
+      "owner": "witnessmenow",
       "name": "UniversalTelegramBot"
     }
   ],
